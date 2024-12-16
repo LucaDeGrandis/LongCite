@@ -4,12 +4,12 @@ import os, json
 from tqdm import tqdm
 import traceback
 
-API_KEYS = {
-    "openai": '',
-    "zhipu": '',
-    "anthropic": '',
-    'vllm': 'token-abc123',
-}
+# API_KEYS = {
+#     "openai": '',
+#     "zhipu": '',
+#     "anthropic": '',
+#     'vllm': 'token-abc123',
+# }
 
 API_URLS = {
     'openai': 'https://api.openai.com/v1/chat/completions',
@@ -18,15 +18,23 @@ API_URLS = {
     'vllm': 'http://127.0.0.1:8000/v1/chat/completions',
 }
 
-def query_llm(messages, model, temperature=1.0, max_new_tokens=1024, stop=None, return_usage=False):
+def query_llm(
+    messages,
+    model,
+    temperature=1.0,
+    max_new_tokens=1024,
+    stop=None,
+    return_usage=False,
+    api_key=None,
+):
     if 'gpt' in model:
-        api_key, api_url = API_KEYS['openai'], API_URLS['openai']
+        api_url = API_URLS['openai']
     elif 'glm' in model:
-        api_key, api_url = API_KEYS['zhipu'], API_URLS['zhipu']
+        api_url = API_URLS['zhipu']
     elif 'claude' in model:
-        api_key, api_url = API_KEYS['anthropic'], API_URLS['anthropic']
+        api_url = API_URLS['anthropic']
     else:
-        api_key, api_url = API_KEYS['vllm'], API_URLS['vllm']
+        api_url = API_URLS['vllm']
     tries = 0
     while tries < 5:
         tries += 1
