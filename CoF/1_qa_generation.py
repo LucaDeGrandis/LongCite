@@ -9,11 +9,32 @@ import random
 import sys
 sys.path.append('../')
 from utils.llm_api import query_llm
+import argparse
 
-MODEL = 'glm-4-0520'
+
+def parse_arguments():
+    """
+    Parses arguments.
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--model", type=str, help="The LLM used to generate the questions.")
+    parser.add_argument("--ipts", type=str, help="The path to the input sample saves as a JSONL file.")
+    parser.add_argument("--api_key", type=str, help="The api key in case you are using closed models.")
+    parser.add_argument("--out_dir", type=str, help="The output directory.")
+
+    args = parser.parse_args()
+
+    return args
+
+
+args = parse_arguments()
+
+
+MODEL = args.model
 parallel_num = 1
-ipts = [x for x in jsonlines.open("input_sample.jsonl")]
-save_dir = './results'
+ipts = [x for x in jsonlines.open(f"{args.ipts}")]
+save_dir = f"{args.out_dir}"
 os.makedirs(save_dir, exist_ok=True)
 fout_path = f'{save_dir}/1_qa.jsonl'
 if os.path.exists(fout_path):
@@ -77,7 +98,7 @@ def generate_query(context):
                 prompt = context + '''\n\nGiven the above text, please propose 5 English information-seeking questions, make sure they are diversed and cover all parts of the text, in the following format: "1: ", "2: ", ...'''
     msg = [{'role': 'user', 'content': prompt}]
     # print(prompt)
-    output = query_llm(msg, model=MODEL, temperature=1, max_new_tokens=2048)
+    output = query_llm(msg, model=MODEL, temperature=1, max_new_tokens=2048, api_key=args.api_key)
     # print(output)
     if output is None:
         return None
