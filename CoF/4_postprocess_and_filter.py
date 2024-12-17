@@ -1,14 +1,39 @@
-import os, json, re, jsonlines
-from tqdm import tqdm
-import traceback
+import os
+import re
 import sys
+import json
+import argparse
+import traceback
+import jsonlines
+from tqdm import tqdm
+
 sys.path.append('..')
 from utils.retrieve import text_split_by_punctuation
 from multiprocessing import Pool
 
-ipt_file = './results/3_sentence_level_citation.jsonl'
-fout_path = f"./results/4_final_data.jsonl"
+
+def parse_arguments():
+    """
+    Parses arguments.
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--model", type=str, help="The LLM used to generate the questions.")
+    parser.add_argument("--ipts", type=str, help="The path to the sentence-level citation generation input sample saved as a JSONL file.")
+    parser.add_argument("--out_dir", type=str, help="The output directory.")
+
+    args = parser.parse_args()
+
+    return args
+
+
+args = parse_arguments()
+
+
+ipt_file = args.ipts
+fout_path = f"{args.out_dir}/4_final_data.jsonl"
 os.system(f"rm -rf {fout_path}")
+
 
 def strip(s):
     if s.strip() == "":
@@ -18,6 +43,7 @@ def strip(s):
     if s.endswith('\n'):
         s = s[:-1]
     return s
+
 
 def get_cite_str(c_js):
     if c_js['citation'] == []:
@@ -37,6 +63,7 @@ def get_cite_str(c_js):
             pass
     return "".join(merged_citations[:3])
 
+
 def get_citations(statement, c_js):
     st, ed = statement.find("<cite>"), statement.find("</cite>")
     if st == -1:
@@ -47,12 +74,13 @@ def get_citations(statement, c_js):
         raise NotImplementedError
     cite = get_cite_str(c_js)
     return strip(res_statement), cite
-    
+
+
 def process(js):
     try:
         answer, context = js['cited_answer'], js['context']
         all_c_sents = text_split_by_punctuation(context, return_dict=True)
-        
+
         new_passage = ""
         new_passage2 = ""
         for i, c in enumerate(all_c_sents):
@@ -61,7 +89,7 @@ def process(js):
             ed = all_c_sents[i+1]['start_idx'] if i < len(all_c_sents)-1 else len(context)
             new_passage += f"<C{i}>"+context[st:ed]
         new_passage = '''Please answer the user's question based on the following document. When a sentence S in your response uses information from some chunks in the document (i.e., <C{s1}>-<C_{e1}>, <C{s2}>-<C{e2}>, ...), please append these chunk numbers to S in the format "<statement>{S}<cite>[{s1}-{e1}][{s2}-{e2}]...</cite></statement>". You must answer in the same language as the user's question.\n\n[Document Start]\n%s\n[Document End]''' % new_passage
-            
+
         pos = 0
         statements = []
         i = 0
@@ -85,7 +113,7 @@ def process(js):
             else:
                 statements.append((statement, ""))
             pos = ed + len("</statement>")
-        
+
         new_answer = ""
         cnt_s, cnt_c = 0, 0
         for statement, cite_str in statements:
@@ -113,6 +141,7 @@ def process(js):
         print(js['idx'])
         print('-'*200)
         return 1
+
 
 need_list = [x for x in tqdm(jsonlines.open(ipt_file, "r"))]
 with Pool(32) as p:

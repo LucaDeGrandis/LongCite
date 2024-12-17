@@ -149,10 +149,10 @@ def process(js):
                     ed = spans[j][1]
             context_str = '\n\n'.join(relevant_chunks)
             prompt = prompt_format.replace('<<context>>', context_str).replace('<<question>>', query).replace('<<statement>>', statement)
-            print(prompt)
+            # print(prompt)
             msg = [{'role': 'user', 'content': prompt}]
-            output = query_llm(msg, model=cite_model, temperature=1, max_new_tokens=128)
-            print(output)
+            output = query_llm(msg, model=cite_model, temperature=1, max_new_tokens=128, api_key=args.api_key)
+            # print(output)
             if output is None:
                 return 1
             js['statements'][i]['expand_chunk'] = context_str
