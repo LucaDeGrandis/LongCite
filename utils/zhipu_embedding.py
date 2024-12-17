@@ -24,7 +24,6 @@ def embed_with_retry(input):
             )
             # print(response.text)
             response = response.json()
-            print("response: ", response)
             data_list = []
             for i in range(len(text_list)):
                 data_list.append({
