@@ -1,24 +1,49 @@
-import os, sys
-sys.path.append('../')
+import re
+import os
+import sys
+import json
+import argparse
+import jsonlines
+import traceback
+import multiprocessing
+import multiprocessing.pool
 from tqdm import tqdm
-import json, jsonlines
+
+sys.path.append('../')
 from utils.retrieve import batch_search, text_split, text_split_by_punctuation
 from utils.llm_api import query_llm
-from multiprocessing import Pool
-import multiprocessing
-import traceback
-import re
 
-cite_model = "glm-4-0520"
+
+def parse_arguments():
+    """
+    Parses arguments.
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--model", type=str, help="The LLM used to generate the questions.")
+    parser.add_argument("--ipts", type=str, help="The path to the QA input sample saves as a JSONL file.")
+    parser.add_argument("--api_key", type=str, help="The api key in case you are using closed models.")
+    parser.add_argument("--out_dir", type=str, help="The output directory.")
+
+    args = parser.parse_args()
+
+    return args
+
+
+args = parse_arguments()
+
+
+cite_model = args.model
 parallel_num = 1
-ipt_path = "./results/1_qa.jsonl"
-fout_path = "./results/2_chunk_level_citation.jsonl"
+ipt_path = args.ipts
+fout_path = f"{args.out_dir}/2_chunk_level_citation.jsonl"
 
 with open('prompt_chunk_level_citation.txt', "r") as fp:
     prompt_format = fp.read()
 context_chunk_size = 128
 top_retrieval_k = 10
 max_retrieval_tot = 40
+
 
 class NoDaemonProcess(multiprocessing.Process):
     @property
@@ -29,13 +54,14 @@ class NoDaemonProcess(multiprocessing.Process):
     def daemon(self, val):
         pass
 
-import multiprocessing.pool
+
 class NoDaemonProcessPool(multiprocessing.pool.Pool):
     def Process(self, *args, **kwds):
         proc = super(NoDaemonProcessPool, self).Process(*args, **kwds)
         proc.__class__ = NoDaemonProcess
         return proc
-    
+
+
 def run_retrieval(answer, context, chunk_size=128):
     statements = text_split_by_punctuation(answer)
     all_c_chunks = text_split(context, chunk_size=chunk_size)
@@ -48,11 +74,12 @@ def run_retrieval(answer, context, chunk_size=128):
             if c['content'] not in s:
                 topk_c_chunks.append(c)
                 s.add(c['content'])
-    topk_c_chunks = sorted(topk_c_chunks, key=lambda x:x['start_idx'])
+    topk_c_chunks = sorted(topk_c_chunks, key=lambda x: x['start_idx'])
     return topk_c_chunks, all_c_chunks
 
+
 def get_citations(statement, chunks):
-    st, ed = statement.find("<cite>"), statement.find("</cite>")
+    st, _ = statement.find("<cite>"), statement.find("</cite>")
     if st == -1:
         st = len(statement)
     statement, c_text = statement[:st].strip(), statement[st:]
@@ -70,7 +97,8 @@ def get_citations(statement, chunks):
         if len(citations) == 5:
             break
     return statement, citations
-    
+
+
 def postprocess(answer, chunks):
     try:
         pos = 0
@@ -103,23 +131,24 @@ def postprocess(answer, chunks):
         print("-"*200)
         return None
 
+
 def process(js):
     try:
         idx = js['idx']
         context = js['context']
         query, answer = js['query'], js['answer']
         topk_c_chunks, all_c_chunks = run_retrieval(answer, context, chunk_size=context_chunk_size)
-        
+
         context_str = []
         for i, c in enumerate(topk_c_chunks):
             c['top_idx'] = i+1
             context_str.append(f"Snippet [{i+1}]\n{c['content'].strip()}")
         context_str = '\n\n'.join(context_str)
-        
+
         prompt = prompt_format.replace('<<context>>', context_str).replace('<<question>>', query).replace('<<answer>>', answer)
         # print(prompt)
         msg = [{'role': 'user', 'content': prompt}]
-        output = query_llm(msg, model=cite_model, temperature=1, max_new_tokens=2048)
+        output = query_llm(msg, model=cite_model, temperature=1, max_new_tokens=2048, api_key=args.api_key)
         # print(output)
         if output is None:
             return 1
@@ -150,8 +179,9 @@ def process(js):
         print('-'*200)
         return 1
 
+
 if __name__ == '__main__':
-    
+
     if os.path.exists(fout_path):
         with jsonlines.open(fout_path, 'r') as f:
             opts = [x for x in tqdm(f)]
@@ -165,5 +195,3 @@ if __name__ == '__main__':
         rst = list(tqdm(p.imap(process, need_list), total=len(need_list)))
     num_bad_cases = sum(rst)
     print(f'There are {num_bad_cases} bad cases. You can run this scripts again to re-process these bad cases.')
-    
-    
