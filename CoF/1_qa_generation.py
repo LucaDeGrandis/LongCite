@@ -1,15 +1,24 @@
-import os, json, jsonlines
+"""
+In order to run this code you must prepare the ipts file.
+The file must be saved as a JSONL file that contains dictionaries of the following form:
+    {
+        "idx": 0,
+        "context": the entire context in a single string, 
+    }
+"""
+
+
+import os
+import json
+import argparse
+import jsonlines
 from tqdm import tqdm
-import numpy as np
 from multiprocessing import Pool
-import traceback
-import requests
+from utils.llm_api import query_llm
 import re
 import random
 import sys
 sys.path.append('../')
-from utils.llm_api import query_llm
-import argparse
 
 
 def parse_arguments():
@@ -46,8 +55,8 @@ s = set(x['idx'] for x in opts)
 need_list = [x for x in ipts if x['idx'] not in s]
 print(f'Already process: {len(opts)} | Remain to process: {len(need_list)}')
 
+
 def get_lang(input_text):
-    total_len = len(input_text)
     chinese_len = 0
     english_len = 0
 
@@ -62,6 +71,7 @@ def get_lang(input_text):
         return "en"
     else:
         return "zh"
+
 
 def generate_query(context):
     lang = get_lang(context)
@@ -115,10 +125,12 @@ def generate_query(context):
     else:
         return None
 
+
 def generate_answer(context, query):
     msg = [{'role': 'user', 'content': context + '\n\n' + query}]
     output = query_llm(msg, model=MODEL, temperature=1, max_new_tokens=2048)
     return output
+
 
 def process(js):
     idx, context = js['idx'], js['context']
@@ -144,6 +156,6 @@ def process(js):
 with Pool(parallel_num) as p:
     rst = list(tqdm(p.imap(process, need_list), total=len(need_list)))
 
+
 num_bad_cases = sum(rst)
 print(f'There are {num_bad_cases} bad cases. You can run this scripts again to re-process these bad cases.')
-
