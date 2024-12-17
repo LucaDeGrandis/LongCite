@@ -96,11 +96,11 @@ def batch_embed(texts, api_key):
         'embed': torch.tensor(embed, device='cuda:0'),
     }
 
-def batch_search(queries, contexts, k=20):
+def batch_search(queries, contexts, api_key, k=20):
     if isinstance(queries, str):
         queries = [queries]
-    c_res = batch_embed(contexts)
-    q_res = batch_embed(queries)
+    c_res = batch_embed(contexts, api_key)
+    q_res = batch_embed(queries, api_key)
     c, q = c_res['embed'], q_res['embed']
     # print(c.shape)
     # print(q.shape)
