@@ -48,16 +48,14 @@ def query_llm(
                     'x-api-key': api_key,
                     'anthropic-version': "2023-06-01",
                 }
-                
-            resp = requests.post(api_url, json = {
+
+            resp = requests.post(api_url, json={
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_new_tokens,
                 "stop" if 'claude' not in model else 'stop_sequences': stop,
             }, headers=headers, timeout=600)
-            # print(resp.text)
-            # print(resp.status_code)
             if resp.status_code != 200:
                 raise Exception(resp.text)
             resp = resp.json()
@@ -89,4 +87,3 @@ if __name__ == '__main__':
     prompt = '你是谁'
     msg = [{'role': 'user', 'content': prompt}]
     output = query_llm(msg, model=model, temperature=1, max_new_tokens=10, stop=None, return_usage=True)
-    print(output)
