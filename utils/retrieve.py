@@ -1,14 +1,12 @@
-import os, json
-from utils.zhipu_embedding import ZhipuEmbeddings
-import requests
-import traceback
-from transformers import AutoTokenizer
-import torch
 import re
+import torch
 from copy import deepcopy
+from transformers import AutoTokenizer
 from nltk.tokenize import PunktSentenceTokenizer
+from utils.zhipu_embedding import ZhipuEmbeddings
 
 tokenizer = AutoTokenizer.from_pretrained("THUDM/LongCite-glm4-9b", trust_remote_code=True)
+
 
 def text_split_by_punctuation(original_text, return_dict=False):
     # text = re.sub(r'([a-z])\.([A-Z])', r'\1. \2', original_text)  # separate period without space
@@ -48,6 +46,7 @@ def text_split_by_punctuation(original_text, return_dict=False):
             pos = ed
         return res
 
+
 def text_split(content, chunk_size=128, overlap=0, return_token_ids=False):
     texts = []
     chunk_size -= 2*overlap
@@ -68,12 +67,13 @@ def text_split(content, chunk_size=128, overlap=0, return_token_ids=False):
         )
     return texts
 
+
 def cat_chunks(chunks, remove_head_tail=0):
     token_ids = sum([c['token_ids'] for c in chunks], [])
     if remove_head_tail > 0:
         token_ids = token_ids[remove_head_tail:-remove_head_tail]
     return tokenizer.decode(token_ids, add_special_tokens=False)
-            
+
 
 def batch_embed(texts, api_key):
     if isinstance(texts, dict) and 'embed' in texts:
@@ -84,7 +84,7 @@ def batch_embed(texts, api_key):
         embedding_proc=8,
         embedding_batch_size=8,
         api_key=api_key,
-    )  
+    )
     if isinstance(texts[0], str):
         embed = embeddings.embed_documents(texts)
     elif isinstance(texts[0], dict):
@@ -95,6 +95,7 @@ def batch_embed(texts, api_key):
         'docs': texts,
         'embed': torch.tensor(embed, device='cuda:0'),
     }
+
 
 def batch_search(queries, contexts, api_key, k=20):
     if isinstance(queries, str):

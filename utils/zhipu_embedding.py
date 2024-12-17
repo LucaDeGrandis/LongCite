@@ -1,22 +1,7 @@
 import logging
-import warnings
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
-)
-
-import numpy as np
 import requests
 from multiprocessing import Pool
-# from utils.llm_api import API_KEYS
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +39,8 @@ def embed_with_retry(pack, api_key):
 
 
 class ZhipuEmbeddings:
-
     def __init__(
-        self, 
+        self,
         url: Optional[str] = None,
         embedding_proc: int = 8,
         embedding_batch_size: int = 8,
@@ -70,7 +54,7 @@ class ZhipuEmbeddings:
 
         data_processed = []
         for i in range(0, len(texts), self.embedding_batch_size):
-            text_list = texts[i : i + self.embedding_batch_size]
+            text_list = texts[i: i + self.embedding_batch_size]
             data_processed.append((self.url, text_list))
         with Pool(self.embedding_proc) as p:
             result = list(p.imap(embed_with_retry, data_processed, [embed_with_retry] * len(data_processed)))
