@@ -1,22 +1,46 @@
-import os, sys
-sys.path.append('../')
-from tqdm import tqdm
-import json, jsonlines
-from utils.retrieve import text_split_by_punctuation, text_split, cat_chunks
-from utils.llm_api import query_llm
-from multiprocessing import Pool
-import multiprocessing
-from functools import partial
+import os
+import sys
+import json
+import argparse
 import traceback
+import jsonlines
+import multiprocessing
+import multiprocessing.pool
+from tqdm import tqdm
 
-cite_model = "glm-4-0520"
+sys.path.append('../')
+from utils.llm_api import query_llm
+from utils.retrieve import text_split_by_punctuation, text_split, cat_chunks
+
+
+def parse_arguments():
+    """
+    Parses arguments.
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--model", type=str, help="The LLM used to generate the questions.")
+    parser.add_argument("--ipts", type=str, help="The path to the chunk-level citation generation input sample saved as a JSONL file.")
+    parser.add_argument("--api_key", type=str, help="The api key in case you are using closed models.")
+    parser.add_argument("--out_dir", type=str, help="The output directory.")
+
+    args = parser.parse_args()
+
+    return args
+
+
+args = parse_arguments()
+
+
+cite_model = args.model
 parallel_num = 1
-ipt_path = "./results/2_chunk_level_citation.jsonl"
-fout_path = "./results/3_sentence_level_citation.jsonl"
+ipt_path = args.ipts
+fout_path = f"{args.out_dir}/3_sentence_level_citation.jsonl"
 
 with open('prompt_sentence_level_citation.txt', "r") as fp:
     prompt_format = fp.read()
 context_chunk_size = 128
+
 
 class NoDaemonProcess(multiprocessing.Process):
     @property
@@ -27,12 +51,13 @@ class NoDaemonProcess(multiprocessing.Process):
     def daemon(self, val):
         pass
 
-import multiprocessing.pool
+
 class NoDaemonProcessPool(multiprocessing.pool.Pool):
     def Process(self, *args, **kwds):
         proc = super(NoDaemonProcessPool, self).Process(*args, **kwds)
         proc.__class__ = NoDaemonProcess
         return proc
+
 
 def process(js):
     try:
@@ -41,7 +66,7 @@ def process(js):
         all_c_chunks = text_split(context, chunk_size=context_chunk_size, return_token_ids=True)
         all_c_sents = text_split_by_punctuation(context, return_dict=True)
         for i, c_js in enumerate(js['statements']):
-            citations = sorted(c_js['citation'], key=lambda x:x['start'])
+            citations = sorted(c_js['citation'], key=lambda x: x['start'])
             if len(citations) == 0:
                 continue
             statement = c_js['statement']
@@ -68,7 +93,7 @@ def process(js):
                     sents = []
                     for s in all_c_sents:
                         if (s['start_idx'] >= pos and s['start_idx'] <= pos + len(passage)) or (s['end_idx'] >= pos and s['end_idx'] <= pos + len(passage)):
-                            sents.append(s) 
+                            sents.append(s)
                     new_passage = ""
                     for k, s in enumerate(sents):
                         sst, sed = s['start_idx'], s['end_idx']
@@ -79,7 +104,7 @@ def process(js):
                             'content': context[sst:sed],
                             'start': sst,
                             'end': sed,
-                            'cur_idx': sidx, 
+                            'cur_idx': sidx,
                             'c_idx': s['c_idx'],
                         })
                         sidx += 1
@@ -103,7 +128,7 @@ def process(js):
                     sents = []
                     for s in all_c_sents:
                         if (s['start_idx'] >= pos and s['start_idx'] <= pos + len(passage)) or (s['end_idx'] >= pos and s['end_idx'] <= pos + len(passage)):
-                            sents.append(s) 
+                            sents.append(s)
                     new_passage = ""
                     for k, s in enumerate(sents):
                         sst, sed = s['start_idx'], s['end_idx']
@@ -114,7 +139,7 @@ def process(js):
                             'content': context[sst:sed],
                             'start': sst,
                             'end': sed,
-                            'cur_idx': sidx, 
+                            'cur_idx': sidx,
                             'c_idx': s['c_idx'],
                         })
                         sidx += 1
@@ -133,7 +158,7 @@ def process(js):
             js['statements'][i]['expand_chunk'] = context_str
             js['statements'][i]['chunk_sents'] = context_sents
             js['statements'][i]['citation'] = output
-            
+
         with open(fout_path, "a") as fout:
             fout.write(json.dumps(js, ensure_ascii=False)+'\n')
             fout.flush()
@@ -146,8 +171,9 @@ def process(js):
         print('-'*200)
         return 1
 
+
 if __name__ == '__main__':
-    
+
     if os.path.exists(fout_path):
         with jsonlines.open(fout_path, 'r') as f:
             opts = [x for x in tqdm(f)]
@@ -161,4 +187,3 @@ if __name__ == '__main__':
         rst = list(tqdm(p.imap(process, need_list), total=len(need_list)))
     num_bad_cases = sum(rst)
     print(f'There are {num_bad_cases} bad cases. You can run this scripts again to re-process these bad cases.')
-    
