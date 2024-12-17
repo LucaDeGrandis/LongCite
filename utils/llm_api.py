@@ -4,12 +4,12 @@ import os, json
 from tqdm import tqdm
 import traceback
 
-# API_KEYS = {
-#     "openai": '',
-#     "zhipu": '',
-#     "anthropic": '',
-#     'vllm': 'token-abc123',
-# }
+API_KEYS = {
+    "openai": '',
+    "zhipu": '',
+    "anthropic": '',
+    'vllm': 'token-abc123',
+}
 
 API_URLS = {
     'openai': 'https://api.openai.com/v1/chat/completions',

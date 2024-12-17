@@ -20,9 +20,8 @@ from utils.llm_api import API_KEYS
 
 logger = logging.getLogger(__name__)
 
-EMBED_API_KEY = API_KEYS['zhipu']
 
-def embed_with_retry(pack):
+def embed_with_retry(pack, api_key):
     for _ in range(5):
         try:
             url, text_list = pack
@@ -34,11 +33,12 @@ def embed_with_retry(pack):
                 },
                 headers={
                     'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {EMBED_API_KEY}',
+                    'Authorization': f'Bearer {api_key}',
                 },
             )
             # print(response.text)
             response = response.json()
+            print("response: ", response)
             data_list = []
             for i in range(len(text_list)):
                 data_list.append({
@@ -52,6 +52,7 @@ def embed_with_retry(pack):
             print(response.text)
             logging.warning('embed_with_retry exception: %s' % e)
 
+
 class ZhipuEmbeddings:
 
     def __init__(
@@ -59,8 +60,10 @@ class ZhipuEmbeddings:
         url: Optional[str] = None,
         embedding_proc: int = 8,
         embedding_batch_size: int = 8,
+        api_key: str = None,
     ):
         self.url, self.embedding_proc, self.embedding_batch_size = url, embedding_proc, embedding_batch_size
+        self.api_key = api_key
 
     def _get_len_safe_embeddings(self, texts: List[str]) -> List[List[float]]:
         batched_embeddings: List[List[float]] = []
@@ -70,7 +73,7 @@ class ZhipuEmbeddings:
             text_list = texts[i : i + self.embedding_batch_size]
             data_processed.append((self.url, text_list))
         with Pool(self.embedding_proc) as p:
-            result = list(p.imap(embed_with_retry, data_processed))
+            result = list(p.imap(embed_with_retry, data_processed, [embed_with_retry] * len(data_processed)))
         for response in result:
             batched_embeddings.extend(r["embedding"] for r in response["data"])
 
@@ -78,7 +81,6 @@ class ZhipuEmbeddings:
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         return self._get_len_safe_embeddings(texts)
-
 
     def embed_query(self, text: str) -> List[float]:
         return self.embed_documents([text])[0]

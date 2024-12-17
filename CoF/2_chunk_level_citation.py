@@ -22,7 +22,8 @@ def parse_arguments():
 
     parser.add_argument("--model", type=str, help="The LLM used to generate the questions.")
     parser.add_argument("--ipts", type=str, help="The path to the QA input sample saves as a JSONL file.")
-    parser.add_argument("--api_key", type=str, help="The api key in case you are using closed models.")
+    parser.add_argument("--llm_api_key", type=str, help="The api key in case you are using closed models.")
+    parser.add_argument("--embedding_api_key", type=str, help="The api key for the embedding model.")
     parser.add_argument("--out_dir", type=str, help="The output directory.")
 
     args = parser.parse_args()
@@ -62,7 +63,7 @@ class NoDaemonProcessPool(multiprocessing.pool.Pool):
         return proc
 
 
-def run_retrieval(answer, context, chunk_size=128):
+def run_retrieval(answer, context, chunk_size=128, embedding_api_key=None):
     statements = text_split_by_punctuation(answer)
     all_c_chunks = text_split(context, chunk_size=chunk_size)
     output = batch_search(queries=statements, contexts=all_c_chunks, k=top_retrieval_k)
@@ -137,7 +138,7 @@ def process(js):
         idx = js['idx']
         context = js['context']
         query, answer = js['query'], js['answer']
-        topk_c_chunks, all_c_chunks = run_retrieval(answer, context, chunk_size=context_chunk_size)
+        topk_c_chunks, all_c_chunks = run_retrieval(answer, context, chunk_size=context_chunk_size, embedding_api_key=args.embedding_api_key)
 
         context_str = []
         for i, c in enumerate(topk_c_chunks):
@@ -148,7 +149,7 @@ def process(js):
         prompt = prompt_format.replace('<<context>>', context_str).replace('<<question>>', query).replace('<<answer>>', answer)
         # print(prompt)
         msg = [{'role': 'user', 'content': prompt}]
-        output = query_llm(msg, model=cite_model, temperature=1, max_new_tokens=2048, api_key=args.api_key)
+        output = query_llm(msg, model=cite_model, temperature=1, max_new_tokens=2048, api_key=args.llm_api_key)
         # print(output)
         if output is None:
             return 1

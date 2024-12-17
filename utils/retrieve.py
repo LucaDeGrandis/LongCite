@@ -75,14 +75,15 @@ def cat_chunks(chunks, remove_head_tail=0):
     return tokenizer.decode(token_ids, add_special_tokens=False)
             
 
-def batch_embed(texts):
+def batch_embed(texts, api_key):
     if isinstance(texts, dict) and 'embed' in texts:
         return texts
     assert isinstance(texts, list)
     embeddings = ZhipuEmbeddings(
         url="https://open.bigmodel.cn/api/paas/v4/embeddings",
         embedding_proc=8,
-        embedding_batch_size=8, 
+        embedding_batch_size=8,
+        api_key=api_key,
     )  
     if isinstance(texts[0], str):
         embed = embeddings.embed_documents(texts)
