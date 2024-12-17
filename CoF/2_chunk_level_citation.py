@@ -66,7 +66,7 @@ class NoDaemonProcessPool(multiprocessing.pool.Pool):
 def run_retrieval(answer, context, chunk_size=128, embedding_api_key=None):
     statements = text_split_by_punctuation(answer)
     all_c_chunks = text_split(context, chunk_size=chunk_size)
-    output = batch_search(queries=statements, contexts=all_c_chunks, k=top_retrieval_k)
+    output = batch_search(queries=statements, contexts=all_c_chunks, api_key=embedding_api_key, k=top_retrieval_k)
     k = min(top_retrieval_k, (max_retrieval_tot + len(statements) - 1) // len(statements))
     topk_c_chunks = []
     s = set()
