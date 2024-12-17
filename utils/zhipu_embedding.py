@@ -6,7 +6,8 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 
-def embed_with_retry(pack, api_key):
+def embed_with_retry(input):
+    pack, api_key = input
     for _ in range(5):
         try:
             url, text_list = pack
@@ -57,7 +58,7 @@ class ZhipuEmbeddings:
             text_list = texts[i: i + self.embedding_batch_size]
             data_processed.append((self.url, text_list))
         with Pool(self.embedding_proc) as p:
-            result = list(p.imap(embed_with_retry, data_processed, [embed_with_retry] * len(data_processed)))
+            result = list(p.imap(embed_with_retry, zip(data_processed, [self.api_key] * len(data_processed))))
         for response in result:
             batched_embeddings.extend(r["embedding"] for r in response["data"])
 
